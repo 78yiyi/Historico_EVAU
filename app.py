@@ -11,7 +11,7 @@ st.set_page_config(page_title="Resultados EvAU La Salle Griñón", layout="wide"
 st.title("📊 Resultados EvAU - La Salle Griñón")
 
 # 3. MENÚ DE NAVEGACIÓN (BARRA LATERAL)
-st.sidebar.title("Navegacion")
+st.sidebar.title("Navegación")
 # Creamos botones de selección (radio buttons) para las distintas vistas
 opcion = st.sidebar.radio(
     "Selecciona una vista:",
