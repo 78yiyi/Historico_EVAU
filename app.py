@@ -168,19 +168,216 @@ elif opcion == "Comparación por Centros":
                 # Ordenamos las fechas de izquierda a derecha
                 df_filtrado = df_filtrado.sort_values(by="Curso")
                 
-                # Dibujamos la gráfica
-                fig2 = px.line(
+elif opcion == "Comparación por Centros":
+    st.header("🏫 Comparación con otros centros")
+    
+    try:
+        # Leemos el archivo en bruto
+        raw_df = pd.read_excel("Historico_EvAU.xlsx", sheet_name="Otros Coles", header=None)
+        
+        # Limpiamos filas que estén 100% en blanco para evitar descuadres
+        raw_df = raw_df.dropna(how='all').reset_index(drop=True)
+        
+        # 1. Buscamos automáticamente dónde empiezan los colegios para no depender de una fila fija
+        start_idx = -1
+        for i in range(len(raw_df)):
+            val = str(raw_df.iloc[i, 0]).strip().upper()
+            # Si encuentra uno de estos nombres, sabemos que aquí empiezan los datos reales
+            if val in ["CAM", "LSG", "CASTILLA", "IES GRIÑÓN", "VILLA GRIÑÓN", "CATÓN", "IES CUBAS"]:
+                start_idx = i
+                break
+                
+        if start_idx == -1:
+            st.error("⚠️ No se pudo detectar el inicio de los datos en la primera columna.")
+        else:
+            # 2. Rescatamos los años. En tu archivo están arriba del todo (fila 0).
+            # ffill() rellena los años hacia la derecha para cubrir las celdas combinadas de Excel
+            años = pd.Series(raw_df.iloc[0, :].values).ffill().values
+            
+            # 3. Forzamos LAS VARIABLES EXACTAS que me has indicado
+            lista_metricas_oficial = [
+                "% Titulados Bach", 
+                "%Aprobados EvAU", 
+                "Presentados EvAU", 
+                "Media EvAU Aprobados", 
+                "Media FG"
+            ]
+            
+            datos_limpios = []
+            
+            # 4. Procesamos fila por fila y columna por columna
+            for i in range(start_idx, len(raw_df)):
+                centro = str(raw_df.iloc[i, 0]).strip()
+                # Saltamos si no hay centro
+                if pd.isna(raw_df.iloc[i, 0]) or centro == "nan" or centro == "":
+                    continue
+                    
+                # Recorremos cada columna de datos (empezando por la 1, donde están las notas)
+                for col_idx in range(1, len(raw_df.columns)):
+                    año = str(años[col_idx]).strip()
+                    
+                    # Ignoramos columnas fuera de los años (por si Excel lee columnas extra a la derecha)
+                    if año == "nan" or año == "" or len(año) < 4:
+                        continue
+                        
+                    # MAGIA AQUÍ: Calculamos qué métrica es según su posición.
+                    # Al ser grupos de 5 columnas, el resto de la división nos da la métrica exacta.
+                    metrica_actual = lista_metricas_oficial[(col_idx - 1) % 5]
+                    
+                    valor = raw_df.iloc[i, col_idx]
+                    
+                    # 5. Limpiamos las comas por puntos para que sean números
+                    if pd.notna(valor) and str(valor).strip() != "":
+                        if isinstance(valor, str):
+                            valor = valor.replace('"', '').replace("'", "").replace(",", ".").strip()
+                        try:
+                            datos_limpios.append({
+                                "Centro": centro,
+                                "Curso": año,
+                                "Métrica": metrica_actual,
+                                "Valor": float(valor)
+                            })
+                        except ValueError:
+                            pass # Si hay texto extraño en la tabla, lo ignora
+                            
+            # Convertimos la lista en una tabla limpia
+            df_clean = pd.DataFrame(datos_limpios)
+            
+            if df_clean.empty:
+                st.warning("No se pudieron procesar los números. Comprueba los datos de la pestaña.")
+            else:
+                # --- INTERFAZ ---
+                # Ahora el menú mostrará sí o sí tus 5 variables limpias
+                metrica_sel = st.selectbox(
+                    "Selecciona la métrica que deseas comparar visualmente:", 
+                    lista_metricas_oficial
+                )
+                
+                # Filtramos los datos para la gráfica
+                df_filtrado = df_clean[df_clean["Métrica"] == metrica_sel]
+                
+                # Ordenamos las fechas de izquierda a derecha
+                df_filtrado = df_filtrado.sort_values(by="Curso")
+                
+elif opcion == "Comparación por Centros":
+    st.header("🏫 Comparación con otros centros")
+    
+    try:
+        # Leemos el archivo en bruto
+        raw_df = pd.read_excel("Historico_EvAU.xlsx", sheet_name="Otros Coles", header=None)
+        
+        # Limpiamos filas que estén 100% en blanco para evitar descuadres
+        raw_df = raw_df.dropna(how='all').reset_index(drop=True)
+        
+        # 1. Buscamos automáticamente dónde empiezan los colegios para no depender de una fila fija
+        start_idx = -1
+        for i in range(len(raw_df)):
+            val = str(raw_df.iloc[i, 0]).strip().upper()
+            # Si encuentra uno de estos nombres, sabemos que aquí empiezan los datos reales
+            if val in ["CAM", "LSG", "CASTILLA", "IES GRIÑÓN", "VILLA GRIÑÓN", "CATÓN", "IES CUBAS"]:
+                start_idx = i
+                break
+                
+        if start_idx == -1:
+            st.error("⚠️ No se pudo detectar el inicio de los datos en la primera columna.")
+        else:
+            # 2. Rescatamos los años. En tu archivo están arriba del todo (fila 0).
+            # ffill() rellena los años hacia la derecha para cubrir las celdas combinadas de Excel
+            años = pd.Series(raw_df.iloc[0, :].values).ffill().values
+            
+            # 3. Forzamos LAS VARIABLES EXACTAS que me has indicado
+            lista_metricas_oficial = [
+                "% Titulados Bach", 
+                "%Aprobados EvAU", 
+                "Presentados EvAU", 
+                "Media EvAU Aprobados", 
+                "Media FG"
+            ]
+            
+            datos_limpios = []
+            
+            # 4. Procesamos fila por fila y columna por columna
+            for i in range(start_idx, len(raw_df)):
+                centro = str(raw_df.iloc[i, 0]).strip()
+                # Saltamos si no hay centro
+                if pd.isna(raw_df.iloc[i, 0]) or centro == "nan" or centro == "":
+                    continue
+                    
+                # Recorremos cada columna de datos (empezando por la 1, donde están las notas)
+                for col_idx in range(1, len(raw_df.columns)):
+                    año = str(años[col_idx]).strip()
+                    
+                    # Ignoramos columnas fuera de los años (por si Excel lee columnas extra a la derecha)
+                    if año == "nan" or año == "" or len(año) < 4:
+                        continue
+                        
+                    # MAGIA AQUÍ: Calculamos qué métrica es según su posición.
+                    # Al ser grupos de 5 columnas, el resto de la división nos da la métrica exacta.
+                    metrica_actual = lista_metricas_oficial[(col_idx - 1) % 5]
+                    
+                    valor = raw_df.iloc[i, col_idx]
+                    
+                    # 5. Limpiamos las comas por puntos para que sean números
+                    if pd.notna(valor) and str(valor).strip() != "":
+                        if isinstance(valor, str):
+                            valor = valor.replace('"', '').replace("'", "").replace(",", ".").strip()
+                        try:
+                            datos_limpios.append({
+                                "Centro": centro,
+                                "Curso": año,
+                                "Métrica": metrica_actual,
+                                "Valor": float(valor)
+                            })
+                        except ValueError:
+                            pass # Si hay texto extraño en la tabla, lo ignora
+                            
+            # Convertimos la lista en una tabla limpia
+            df_clean = pd.DataFrame(datos_limpios)
+            
+            if df_clean.empty:
+                st.warning("No se pudieron procesar los números. Comprueba los datos de la pestaña.")
+            else:
+                # --- INTERFAZ ---
+                # Ahora el menú mostrará sí o sí tus 5 variables limpias
+                metrica_sel = st.selectbox(
+                    "Selecciona la métrica que deseas comparar visualmente:", 
+                    lista_metricas_oficial
+                )
+                
+                # Filtramos los datos para la gráfica
+                df_filtrado = df_clean[df_clean["Métrica"] == metrica_sel]
+                
+                # Ordenamos las fechas de izquierda a derecha
+                df_filtrado = df_filtrado.sort_values(by="Curso")
+                
+# 5. Creamos la gráfica de columnas (barras verticales) con Plotly
+                fig2 = px.bar(
                     df_filtrado, 
                     x="Curso", 
                     y="Valor", 
                     color="Centro", 
-                    markers=True, 
-                    title=f"Evolución Histórica Comparada: {metrica_sel}"
+                    barmode="group",       # Agrupa las columnas de los colegios una al lado de la otra por cada año
+                    title=f"Evolución Histórica Comparada: {metrica_sel}",
+                    labels={"Curso": "Curso Académico", "Valor": "Resultado / Nota", "Centro": "Centro Educativo"}
                 )
                 
-                # Efecto visual al pasar el ratón
-                fig2.update_layout(hovermode="x unified")
+                # Mejoramos el diseño visual de las columnas
+                fig2.update_layout(
+                    hovermode="x unified",
+                    xaxis={'categoryorder':'category ascending'} # Asegura que los años se ordenen de más antiguo a más reciente
+                )
+                
+                # Ajustamos para que al pasar el ratón se muestren los datos de forma limpia
+                fig2.update_traces(textposition='outside') 
+                
+                # Mostramos la gráfica en la aplicación web
                 st.plotly_chart(fig2, use_container_width=True)
+                
+    except Exception as e:
+        st.error(f"⚠️ Ocurrió un error al procesar el archivo: {e}")
+                
+    except Exception as e:
+        st.error(f"⚠️ Ocurrió un error al procesar el archivo: {e}")
                 
     except Exception as e:
         st.error(f"⚠️ Ocurrió un error al procesar el archivo: {e}")
