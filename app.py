@@ -164,6 +164,16 @@ elif opcion == "Comparación por Centros":
                 )
                 
                 st.plotly_chart(fig2, use_container_width=True)
+                with st.expander(f"Ver tabla de datos detallada: {metrica_sel}"):
+                    try:
+                        # Transformamos los datos para que los centros sean las filas y los años las columnas
+                        df_tabla = df_filtrado.pivot(index="Centro", columns="Curso", values="Valor")
+                        
+                        # Mostramos la tabla en la web
+                        st.dataframe(df_tabla, use_container_width=True)
+                    except Exception as e:
+                        # Por si hay algún dato duplicado raro en el Excel que impida hacer la tabla
+                        st.dataframe(df_filtrado[["Centro", "Curso", "Valor"]], use_container_width=True)
                 
     except Exception as e:
         st.error(f"⚠️ Ocurrió un error al procesar el archivo: {e}")
