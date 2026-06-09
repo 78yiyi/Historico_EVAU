@@ -79,8 +79,97 @@ if opcion == "Nº Presentados por Año":
         st.error(f"⚠️ Ocurrió un error al procesar el código: {e}")
 elif opcion == "Comparación por Centros":
     st.header("🏫 Comparación con otros centros")
-    st.write("Análisis comparativo utilizando el archivo 'Histórico EvAU - Otros Coles.csv'.")
-    # Lógica futura para leer y graficar "Otros Coles.csv"
+    
+    try:
+        # 1. Cargamos el archivo de Excel apuntando a la pestaña específica
+        # NOTA: Asegúrate de que el nombre "Otros Coles" coincide exactamente con tu pestaña de Excel
+        raw_df = pd.read_excel("Historico_EvAU.xlsx", sheet_name="Otros Coles", header=None)
+        
+        # 2. Procesamiento de cabeceras dobles (Años y Métricas)
+        # Extraemos los nombres de los colegios (están a partir de la fila index 3, columna 0)
+        centros = raw_df.iloc[3:, 0].dropna().values
+        
+        # Rellenamos los años hacia la derecha (ffill) porque en Excel suelen estar en celdas combinadas
+        años = pd.Series(raw_df.iloc[0, :].values).ffill().values
+        metricas = raw_df.iloc[1, :].values
+        
+        # Creamos una lista limpia para reestructurar los datos
+        datos_limpios = []
+        
+        # Recorremos cada fila de colegios
+        for i, centro in enumerate(centros):
+            fila_idx = i + 3  # Los datos de los colegios empiezan en la fila 3 (index)
+            
+            # Recorremos cada columna de datos (empezando en la columna 1)
+            for col_idx in range(1, raw_df.shape[1]):
+                año = años[col_idx]
+                metrica = metricas[col_idx]
+                valor = raw_df.iloc[fila_idx, col_idx]
+                
+                # Si la celda no está vacía, procesamos el número
+                if pd.notna(valor) and str(valor).strip() != "" and str(valor).strip() != "nan":
+                    # Limpieza de formato de texto/comas de Excel
+                    if isinstance(valor, str):
+                        valor = valor.replace('"', '').replace("'", "").replace(",", ".").strip()
+                    
+                    try:
+                        valor_numerico = float(valor)
+                        datos_limpios.append({
+                            "Centro": str(centro).strip(),
+                            "Curso": str(año).strip(),
+                            "Métrica": str(metrica).strip(),
+                            "Valor": valor_numerico
+                        })
+                    except ValueError:
+                        # Si hay un texto que no se puede convertir a número, lo saltamos de forma segura
+                        pass
+        
+        # Convertimos la lista en un DataFrame de Pandas estructurado
+        df_clean = pd.DataFrame(datos_limpios)
+        
+        # Mapeamos los nombres exactos de tus columnas de Excel para que el menú sea amigable
+        # Esto asegura que encuentre exactamente el texto de tu segunda fila
+        lista_metricas_disponibles = df_clean["Métrica"].unique()
+        
+        # 3. Interfaz de usuario: Desplegable para seleccionar qué comparar
+        metrica_sel = st.selectbox(
+            "Selecciona la métrica que deseas comparar visualmente:", 
+            lista_metricas_disponibles
+        )
+        
+        # 4. Filtramos los datos por la métrica elegida
+        df_filtrado = df_clean[df_clean["Métrica"] == metrica_sel]
+        
+        # Ordenamos por curso para que la línea de la gráfica evolucione cronológicamente de izquierda a derecha
+        df_filtrado = df_filtrado.sort_values(by="Curso")
+        
+        # 5. Creamos la gráfica de líneas interactiva con Plotly
+        fig2 = px.line(
+            df_filtrado, 
+            x="Curso", 
+            y="Valor", 
+            color="Centro",        # Una línea de diferente color para cada colegio
+            markers=True,          # Añade puntitos en cada año para pinchar con el ratón
+            title=f"Evolución Histórica Comparada: {metrica_sel}",
+            labels={"Curso": "Curso Académico", "Valor": "Resultado / Nota", "Centro": "Centro Educativo"}
+        )
+        
+        # Mejoramos el diseño de la gráfica para que se vea más limpia y moderna
+        fig2.update_layout(hovermode="x unified")
+        
+        # Mostramos la gráfica en la aplicación web
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        # Extra: Desplegable opcional para ver los datos limpios en formato tabla
+        with st.expander("Ver tabla de datos procesados"):
+            st.dataframe(df_filtrado, use_container_width=True)
+            
+    except FileNotFoundError:
+        st.error("⚠️ No se ha encontrado el archivo 'Historico_EvAU.xlsx' en la carpeta del proyecto.")
+    except KeyError:
+        st.error("⚠️ No se encontró la pestaña 'Otros Coles'. Revisa que el nombre en tu Excel sea exacto.")
+    except Exception as e:
+        st.error(f"⚠️ Ocurrió un error inesperado al procesar los datos: {e}")
 
 elif opcion == "Por Materias":
     st.header("📚 Resultados por Materia")
