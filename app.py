@@ -182,64 +182,67 @@ elif opcion == "Por Materias":
     st.header("📚 Resultados por Materia")
     
     try:
-        # 1. Leer las hojas disponibles en el Excel dinámicamente
         xls = pd.ExcelFile("Historico_EvAU.xlsx")
-        
-        # Excluimos las pestañas que no son asignaturas individuales
         hojas_excluir = ["Fase General", "Titulan", "Otros Coles", "Por año", "Por Año"]
         materias_disponibles = [hoja for hoja in xls.sheet_names if hoja not in hojas_excluir]
         
         if not materias_disponibles:
             st.warning("No se han encontrado pestañas de materias en el archivo Excel.")
         else:
-            # 2. Menú desplegable para elegir la asignatura
             materia_sel = st.selectbox("Selecciona la materia para ver su análisis detallado:", materias_disponibles)
-            
-            # 3. Leer los datos de la pestaña seleccionada
             df_mat = pd.read_excel(xls, sheet_name=materia_sel)
             
-            # Limpiamos los nombres de las columnas por si hay espacios invisibles
             df_mat.columns = [str(c).strip() for c in df_mat.columns]
-            
-            # Renombramos la primera columna a "Curso"
             df_mat.rename(columns={df_mat.columns[0]: 'Curso'}, inplace=True)
             df_mat = df_mat.dropna(subset=['Curso'])
             df_mat = df_mat.sort_values(by='Curso')
             
-            # Función para limpiar los números (quitar %, cambiar comas por puntos)
-            def limpiar_numeros(val):
+            # --- NUEVA FUNCIÓN DE LIMPIEZA INTELIGENTE ---
+            def limpiar_numeros(val, es_porc):
                 if pd.isna(val) or str(val).strip() == "": 
                     return None
-                val_str = str(val).replace("%", "").replace(",", ".").strip()
+                
+                # Comprobamos si el Excel ya nos lo da como texto con el símbolo %
+                tiene_simbolo = isinstance(val, str) and "%" in val
+                
+                # Limpiamos el texto
+                val_str = str(val).replace("%", "").replace('"', '').replace("'", "").replace(",", ".").strip()
+                
                 try: 
-                    return float(val_str)
+                    num = float(val_str)
+                    # Si es una columna de % y Excel lo leyó como decimal (ej. 0.82 en lugar de 82)
+                    if es_porc and not tiene_simbolo and num <= 1.0:
+                        num = num * 100
+                        
+                    return round(num, 2) # Redondeamos a 2 decimales para que quede limpio
                 except ValueError: 
                     return None
                 
-            # Aplicamos la limpieza a las columnas clave que vamos a graficar
             cols_graficas = ["% LSG", "NM LSG EvAU", "NM LSG Cole", "% UC3M", "NM UC3M"]
             for col in cols_graficas:
                 if col in df_mat.columns:
-                    df_mat[col] = df_mat[col].apply(limpiar_numeros)
+                    # Detectamos automáticamente si el nombre de la columna incluye el símbolo %
+                    es_porcentaje = "%" in col 
+                    # Aplicamos la limpieza pasándole esa información
+                    df_mat[col] = df_mat[col].apply(lambda x: limpiar_numeros(x, es_porcentaje))
             
-            st.divider() # Añade una línea separadora elegante
+            st.divider()
             st.subheader(f"Estadísticas Históricas: {materia_sel}")
             
-            # 4. DISEÑO EN CUADRÍCULA (2 columnas)
             col1, col2 = st.columns(2)
             
             with col1:
-                # Gráfica 1: Nota media histórica de la materia (Columnas)
+                # 1. Nota Media de la Materia
                 if "NM LSG EvAU" in df_mat.columns:
                     fig1 = px.bar(df_mat, x="Curso", y="NM LSG EvAU", 
                                   title="1. Nota Media de la Materia (EvAU)",
                                   text="NM LSG EvAU",
-                                  color_discrete_sequence=["#2ca02c"]) # Color verde
+                                  color_discrete_sequence=["#2ca02c"])
                     fig1.update_traces(textposition='outside')
                     fig1.update_layout(xaxis={'categoryorder':'category ascending'})
                     st.plotly_chart(fig1, use_container_width=True)
                 
-                # Gráfica 3: Nota Media EvAU: LSG vs UC3M (Líneas comparativas)
+                # 3. Nota Media EvAU: LSG vs UC3M
                 if "NM LSG EvAU" in df_mat.columns and "NM UC3M" in df_mat.columns:
                     fig3 = px.line(df_mat, x="Curso", y=["NM LSG EvAU", "NM UC3M"], 
                                    title="3. Nota Media EvAU: LSG vs Media UC3M",
@@ -249,16 +252,21 @@ elif opcion == "Por Materias":
                     st.plotly_chart(fig3, use_container_width=True)
 
             with col2:
-                # Gráfica 2: % Aprobados: LSG vs UC3M (Líneas comparativas)
+                # 2. % Aprobados: LSG vs UC3M (¡AQUÍ AÑADIMOS EL SÍMBOLO %!)
                 if "% LSG" in df_mat.columns and "% UC3M" in df_mat.columns:
                     fig2 = px.line(df_mat, x="Curso", y=["% LSG", "% UC3M"], 
                                    title="2. % de Aprobados: LSG vs Media UC3M",
                                    markers=True,
                                    labels={"value": "% Aprobados", "variable": "Institución"})
-                    fig2.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'})
+                    
+                    fig2.update_layout(
+                        hovermode="x unified", 
+                        xaxis={'categoryorder':'category ascending'},
+                        yaxis=dict(ticksuffix="%") # Esto dibuja el símbolo % en el eje vertical
+                    )
                     st.plotly_chart(fig2, use_container_width=True)
                 
-                # Gráfica 4: Nota Media: EvAU vs Colegio (Líneas comparativas)
+                # 4. Nota Media: EvAU vs Colegio
                 if "NM LSG EvAU" in df_mat.columns and "NM LSG Cole" in df_mat.columns:
                     fig4 = px.line(df_mat, x="Curso", y=["NM LSG EvAU", "NM LSG Cole"], 
                                    title="4. Desviación de Nota: EvAU vs Colegio (LSG)",
@@ -267,14 +275,10 @@ elif opcion == "Por Materias":
                     fig4.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'})
                     st.plotly_chart(fig4, use_container_width=True)
                     
-            # 5. Añadimos la tabla de datos procesados al final
             with st.expander(f"Ver tabla de datos detallada de {materia_sel}"):
-                # Filtramos para mostrar solo las columnas que existen en esta asignatura
                 cols_mostrar = ["Curso"] + [c for c in cols_graficas if c in df_mat.columns]
                 st.dataframe(df_mat[cols_mostrar], use_container_width=True)
                 
-    except FileNotFoundError:
-        st.error("⚠️ No se ha encontrado el archivo 'Historico_EvAU.xlsx'.")
     except Exception as e:
         st.error(f"⚠️ Ocurrió un error al procesar las materias: {e}")
 elif opcion == "Por Años":
