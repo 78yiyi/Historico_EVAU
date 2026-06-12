@@ -346,11 +346,10 @@ elif opcion == "Por Años":
             
             st.divider()
             
-            # --- 5. GRÁFICAS COMPARATIVAS ---
+# --- 5. GRÁFICAS COMPARATIVAS ---
             
             # Gráfica 1 (Ancho completo): % Aprobados LSG vs UC3M
             st.subheader(f"1. Porcentaje de Aprobados: LSG vs Media UC3M ({curso_sel})")
-            # Agrupamos los datos para poder dibujar dos barras por materia
             df_melt_1 = df_filtrado.melt(id_vars="Materia", value_vars=["% LSG", "% UC3M"], 
                                          var_name="Institución", value_name="% Aprobados")
             fig1 = px.bar(df_melt_1, x="Materia", y="% Aprobados", color="Institución", barmode="group",
@@ -359,28 +358,27 @@ elif opcion == "Por Años":
             fig1.update_layout(yaxis=dict(ticksuffix="%"))
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Dividimos la pantalla en 2 para las notas medias
-            col1, col2 = st.columns(2)
+            st.divider() # Añadimos una línea separadora para que quede más elegante
             
-            with col1:
-                # Gráfica 2: Nota media LSG EvAU vs LSG Cole
-                st.subheader("2. Nota Media: EvAU vs Colegio")
-                df_melt_2 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM LSG Cole"], 
-                                             var_name="Evaluación", value_name="Nota Media")
-                fig2 = px.bar(df_melt_2, x="Materia", y="Nota Media", color="Evaluación", barmode="group",
-                              text="Nota Media", color_discrete_sequence=["#1f77b4", "#ff7f0e"])
-                fig2.update_traces(textposition='outside')
-                st.plotly_chart(fig2, use_container_width=True)
-                
-            with col2:
-                # Gráfica 3: Nota media LSG EvAU vs UC3M
-                st.subheader("3. Nota Media EvAU: LSG vs Media UC3M")
-                df_melt_3 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM UC3M"], 
-                                             var_name="Institución", value_name="Nota Media")
-                fig3 = px.bar(df_melt_3, x="Materia", y="Nota Media", color="Institución", barmode="group",
-                              text="Nota Media", color_discrete_sequence=["#2ca02c", "#d62728"])
-                fig3.update_traces(textposition='outside')
-                st.plotly_chart(fig3, use_container_width=True)
+            # Gráfica 2 (Ancho completo): Nota media LSG EvAU vs LSG Cole
+            st.subheader("2. Nota Media: EvAU vs Colegio")
+            df_melt_2 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM LSG Cole"], 
+                                         var_name="Evaluación", value_name="Nota Media")
+            fig2 = px.bar(df_melt_2, x="Materia", y="Nota Media", color="Evaluación", barmode="group",
+                          text="Nota Media", color_discrete_sequence=["#1f77b4", "#ff7f0e"])
+            fig2.update_traces(textposition='outside')
+            st.plotly_chart(fig2, use_container_width=True)
+            
+            st.divider()
+            
+            # Gráfica 3 (Ancho completo): Nota media LSG EvAU vs UC3M
+            st.subheader("3. Nota Media EvAU: LSG vs Media UC3M")
+            df_melt_3 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM UC3M"], 
+                                         var_name="Institución", value_name="Nota Media")
+            fig3 = px.bar(df_melt_3, x="Materia", y="Nota Media", color="Institución", barmode="group",
+                          text="Nota Media", color_discrete_sequence=["#2ca02c", "#d62728"])
+            fig3.update_traces(textposition='outside')
+            st.plotly_chart(fig3, use_container_width=True)
                 
             # Tabla de datos final
             with st.expander(f"Ver tabla de datos detallada del curso {curso_sel}"):
