@@ -282,5 +282,109 @@ elif opcion == "Por Materias":
     except Exception as e:
         st.error(f"⚠️ Ocurrió un error al procesar las materias: {e}")
 elif opcion == "Por Años":
-    st.header("📅 Resultados detallados por Año")
-    st.info("¡Sección en construcción! Más adelante programaremos esta vista detallada.")
+    st.header("📅 Resultados detallados por Año Académico")
+    
+    try:
+        # 1. Leemos la pestaña (probamos ambas formas por si acaso la A está en mayúscula)
+        try:
+            raw_df = pd.read_excel("Historico_EvAU.xlsx", sheet_name="Por año", header=None)
+        except:
+            raw_df = pd.read_excel("Historico_EvAU.xlsx", sheet_name="Por Año", header=None)
+            
+        # 2. Extracción inteligente de datos
+        datos = []
+        for i in range(len(raw_df)):
+            curso = str(raw_df.iloc[i, 0]).strip()
+            materia = str(raw_df.iloc[i, 1]).strip()
+            
+            # Si el curso tiene un guion (ej. 24-25) y la materia es válida, extraemos la fila
+            if "-" in curso and len(curso) == 5 and materia.lower() not in ["nan", "materia", ""]:
+                datos.append({
+                    "Curso": curso,
+                    "Materia": materia,
+                    "% LSG": raw_df.iloc[i, 4],
+                    "NM LSG EvAU": raw_df.iloc[i, 5],
+                    "NM LSG Cole": raw_df.iloc[i, 6],
+                    "% UC3M": raw_df.iloc[i, 7],
+                    "NM UC3M": raw_df.iloc[i, 8]
+                })
+                
+        df_anyos = pd.DataFrame(datos)
+        
+        if df_anyos.empty:
+            st.warning("⚠️ No se pudieron extraer los datos. Revisa el formato de la pestaña 'Por año'.")
+        else:
+            # 3. Función de limpieza de números y porcentajes
+            def limpiar_numeros(val, es_porc):
+                if pd.isna(val) or str(val).strip() == "" or str(val).strip() == "nan": 
+                    return None
+                tiene_simbolo = isinstance(val, str) and "%" in val
+                val_str = str(val).replace("%", "").replace('"', '').replace("'", "").replace(",", ".").strip()
+                try: 
+                    num = float(val_str)
+                    if es_porc and not tiene_simbolo and num <= 1.0:
+                        num = num * 100
+                    return round(num, 2)
+                except ValueError: 
+                    return None
+
+            # Limpiamos todas las columnas numéricas
+            for col in ["% LSG", "NM LSG EvAU", "NM LSG Cole", "% UC3M", "NM UC3M"]:
+                es_porcentaje = "%" in col
+                df_anyos[col] = df_anyos[col].apply(lambda x: limpiar_numeros(x, es_porcentaje))
+                
+            # 4. Interfaz de usuario (Menú de selección de año)
+            # Ordenamos los cursos de más reciente a más antiguo
+            cursos_disponibles = sorted(df_anyos["Curso"].unique(), reverse=True)
+            curso_sel = st.selectbox("Selecciona el curso académico para ver la comparativa:", cursos_disponibles)
+            
+            # Filtramos los datos por el curso elegido
+            df_filtrado = df_anyos[df_anyos["Curso"] == curso_sel]
+            
+            # Quitamos "Fase General" y "Titulan" para que las gráficas solo muestren asignaturas reales
+            df_filtrado = df_filtrado[~df_filtrado["Materia"].isin(["Fase General", "Titulan"])]
+            
+            st.divider()
+            
+            # --- 5. GRÁFICAS COMPARATIVAS ---
+            
+            # Gráfica 1 (Ancho completo): % Aprobados LSG vs UC3M
+            st.subheader(f"1. Porcentaje de Aprobados: LSG vs Media UC3M ({curso_sel})")
+            # Agrupamos los datos para poder dibujar dos barras por materia
+            df_melt_1 = df_filtrado.melt(id_vars="Materia", value_vars=["% LSG", "% UC3M"], 
+                                         var_name="Institución", value_name="% Aprobados")
+            fig1 = px.bar(df_melt_1, x="Materia", y="% Aprobados", color="Institución", barmode="group",
+                          text="% Aprobados")
+            fig1.update_traces(textposition='outside')
+            fig1.update_layout(yaxis=dict(ticksuffix="%"))
+            st.plotly_chart(fig1, use_container_width=True)
+            
+            # Dividimos la pantalla en 2 para las notas medias
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Gráfica 2: Nota media LSG EvAU vs LSG Cole
+                st.subheader("2. Nota Media: EvAU vs Colegio")
+                df_melt_2 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM LSG Cole"], 
+                                             var_name="Evaluación", value_name="Nota Media")
+                fig2 = px.bar(df_melt_2, x="Materia", y="Nota Media", color="Evaluación", barmode="group",
+                              text="Nota Media", color_discrete_sequence=["#1f77b4", "#ff7f0e"])
+                fig2.update_traces(textposition='outside')
+                st.plotly_chart(fig2, use_container_width=True)
+                
+            with col2:
+                # Gráfica 3: Nota media LSG EvAU vs UC3M
+                st.subheader("3. Nota Media EvAU: LSG vs Media UC3M")
+                df_melt_3 = df_filtrado.melt(id_vars="Materia", value_vars=["NM LSG EvAU", "NM UC3M"], 
+                                             var_name="Institución", value_name="Nota Media")
+                fig3 = px.bar(df_melt_3, x="Materia", y="Nota Media", color="Institución", barmode="group",
+                              text="Nota Media", color_discrete_sequence=["#2ca02c", "#d62728"])
+                fig3.update_traces(textposition='outside')
+                st.plotly_chart(fig3, use_container_width=True)
+                
+            # Tabla de datos final
+            with st.expander(f"Ver tabla de datos detallada del curso {curso_sel}"):
+                st.dataframe(df_filtrado, use_container_width=True)
+                
+    except Exception as e:
+        st.error(f"⚠️ Ocurrió un error al procesar los años: {e}")
