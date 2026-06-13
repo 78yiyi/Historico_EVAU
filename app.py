@@ -172,10 +172,15 @@ elif opcion == "Por Materias":
             
             df_mat.columns = [str(c).strip() for c in df_mat.columns]
             df_mat.rename(columns={df_mat.columns[0]: 'Curso'}, inplace=True)
-            df_mat = df_mat.dropna(subset=['Curso'])
             
-            # SOLUCIÓN al error de sort: Forzar que todos los años sean texto
+            # Convertimos a texto
             df_mat['Curso'] = df_mat['Curso'].astype(str)
+            
+            # --- SOLUCIÓN: FILTRO ESTRICTO ---
+            # Nos quedamos SOLO con las filas cuyo nombre de Curso contenga un guion "-"
+            # Esto elimina de un plumazo cabeceras, filas con "nan", ceros o celdas vacías
+            df_mat = df_mat[df_mat['Curso'].str.contains("-", na=False)]
+            
             df_mat = df_mat.sort_values(by='Curso')
             
             def limpiar_numeros(val, es_porc):
