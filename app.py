@@ -38,6 +38,9 @@ if opcion == "Nº Presentados por Año":
             df_totales = df[df['Materia'] == 'Fase General'].copy()
         else:
             df_totales = df.copy() # Si no hay columna materia, asumimos que todos los datos son válidos
+        # --- LA LÍNEA MÁGICA QUE LO SOLUCIONA ---
+        # Obligamos a que la columna de Presentados sea un número matemático real
+        df_totales['Presentados'] = pd.to_numeric(df_totales['Presentados'], errors='coerce')
             
         # Eliminamos filas sin año y ordenamos cronológicamente
         df_totales = df_totales.dropna(subset=['Curso'])
