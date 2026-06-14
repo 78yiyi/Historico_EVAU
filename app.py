@@ -173,15 +173,14 @@ elif opcion == "Por Materias":
             df_mat.columns = [str(c).strip() for c in df_mat.columns]
             df_mat.rename(columns={df_mat.columns[0]: 'Curso'}, inplace=True)
             
-            # Convertimos a texto
+            # Convertimos a texto y filtramos filas válidas
             df_mat['Curso'] = df_mat['Curso'].astype(str)
-            
-            # --- SOLUCIÓN: FILTRO ESTRICTO ---
-            # Nos quedamos SOLO con las filas cuyo nombre de Curso contenga un guion "-"
-            # Esto elimina de un plumazo cabeceras, filas con "nan", ceros o celdas vacías
             df_mat = df_mat[df_mat['Curso'].str.contains("-", na=False)]
-            
             df_mat = df_mat.sort_values(by='Curso')
+            
+            # Aseguramos que 'Presentados' sea un número para poder dibujarlo en la nueva gráfica
+            if "Presentados" in df_mat.columns:
+                df_mat['Presentados'] = pd.to_numeric(df_mat['Presentados'], errors='coerce')
             
             def limpiar_numeros(val, es_porc):
                 if pd.isna(val) or str(val).strip() == "": return None
@@ -201,39 +200,60 @@ elif opcion == "Por Materias":
                     es_porcentaje = "%" in col 
                     df_mat[col] = df_mat[col].apply(lambda x: limpiar_numeros(x, es_porcentaje))
             
+            # --- SEPARACIÓN DE DATOS PARA EL CURSO 25-26 ---
+            # Excluimos el curso actual de las gráficas comparativas que aún no tienen datos
+            df_mat_historico = df_mat[df_mat['Curso'] != "25-26"]
+            
             st.divider()
             
+            # Maquetación en 2 columnas
             col1, col2 = st.columns(2)
             
             with col1:
+                # GRÁFICA 1: Nota Media (Con todos los años, incluido 25-26)
                 if "NM LSG EvAU" in df_mat.columns:
                     fig1 = px.bar(df_mat, x="Curso", y="NM LSG EvAU", title="1. Nota Media de la Materia (EvAU)", text="NM LSG EvAU", color_discrete_sequence=["#2ca02c"])
                     fig1.update_traces(textposition='outside')
                     fig1.update_layout(xaxis={'categoryorder':'category ascending'})
                     st.plotly_chart(fig1, use_container_width=True)
                 
-                if "NM LSG EvAU" in df_mat.columns and "NM UC3M" in df_mat.columns:
-                    fig3 = px.line(df_mat, x="Curso", y=["NM LSG EvAU", "NM UC3M"], title="3. Nota Media EvAU: LSG vs Media UC3M", markers=True)
-                    fig3.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'})
+                # GRÁFICA 3: % Aprobados (Usa datos históricos, sin 25-26)
+                if "% LSG" in df_mat_historico.columns and "% UC3M" in df_mat_historico.columns:
+                    fig3 = px.line(df_mat_historico, x="Curso", y=["% LSG", "% UC3M"], title="3. % de Aprobados: LSG vs Media UC3M", markers=True)
+                    fig3.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'}, yaxis=dict(ticksuffix="%"))
                     st.plotly_chart(fig3, use_container_width=True)
 
             with col2:
-                if "% LSG" in df_mat.columns and "% UC3M" in df_mat.columns:
-                    fig2 = px.line(df_mat, x="Curso", y=["% LSG", "% UC3M"], title="2. % de Aprobados: LSG vs Media UC3M", markers=True)
-                    fig2.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'}, yaxis=dict(ticksuffix="%"))
+                # GRÁFICA 2: Presentados (NUEVA - Con todos los años, incluido 25-26)
+                if "Presentados" in df_mat.columns:
+                    fig2 = px.bar(df_mat, x="Curso", y="Presentados", title="2. Número de Presentados", text="Presentados", color_discrete_sequence=["#1f77b4"])
+                    fig2.update_traces(textposition='outside')
+                    fig2.update_layout(xaxis={'categoryorder':'category ascending'})
                     st.plotly_chart(fig2, use_container_width=True)
-                
-                if "NM LSG EvAU" in df_mat.columns and "NM LSG Cole" in df_mat.columns:
-                    fig4 = px.line(df_mat, x="Curso", y=["NM LSG EvAU", "NM LSG Cole"], title="4. Desviación de Nota: EvAU vs Colegio (LSG)", markers=True)
+
+                # GRÁFICA 4: Nota Media EvAU vs UC3M (Usa datos históricos, sin 25-26)
+                if "NM LSG EvAU" in df_mat_historico.columns and "NM UC3M" in df_mat_historico.columns:
+                    fig4 = px.line(df_mat_historico, x="Curso", y=["NM LSG EvAU", "NM UC3M"], title="4. Nota Media EvAU: LSG vs Media UC3M", markers=True)
                     fig4.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'})
                     st.plotly_chart(fig4, use_container_width=True)
+            
+            # GRÁFICA 5: EvAU vs Cole (Usa datos históricos, sin 25-26) - Ancho completo
+            if "NM LSG EvAU" in df_mat_historico.columns and "NM LSG Cole" in df_mat_historico.columns:
+                st.write("") # Pequeño espacio visual
+                fig5 = px.line(df_mat_historico, x="Curso", y=["NM LSG EvAU", "NM LSG Cole"], title="5. Desviación de Nota: EvAU vs Colegio (LSG)", markers=True)
+                fig5.update_layout(hovermode="x unified", xaxis={'categoryorder':'category ascending'})
+                st.plotly_chart(fig5, use_container_width=True)
                     
             with st.expander(f"Ver tabla detallada"):
-                cols_mostrar = ["Curso"] + [c for c in cols_graficas if c in df_mat.columns]
+                cols_mostrar = ["Curso", "Presentados"] + [c for c in cols_graficas if c in df_mat.columns]
+                # Eliminamos posibles duplicados y comprobamos que existan
+                cols_mostrar = list(dict.fromkeys(cols_mostrar))
+                cols_mostrar = [c for c in cols_mostrar if c in df_mat.columns]
+                
                 st.dataframe(df_mat[cols_mostrar], use_container_width=True)
                 
     except Exception as e:
-        st.error(f"⚠️ Ocurrió un error al procesar las materias: {e}")
+        st.error(f"⚠️ Ocurrió un error al procesar las materias: {e}")(f"⚠️ Ocurrió un error al procesar las materias: {e}")
 
 elif opcion == "Por Años":
     st.header("📅 Resultados detallados por Año Académico")
